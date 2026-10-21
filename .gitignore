@@ -1,0 +1,26 @@
+﻿# 本地配置与密钥（不要提交）
+config.py
+current-url.txt
+
+# SnowLuma 的配置里有 accessToken
+SnowLuma/config/
+
+# 运行数据
+logs/
+*.log
+__pycache__/
+*.pyc
+
+# 二进制与依赖（体积大，且各平台不同）
+tools/
+SnowLuma/
+downloads/
+qq-bridge/node_modules/
+
+# 音频原曲不转存，只保留切好的音效
+sounds/src/
+
+# 本机专用辅助脚本与笔记（含路径 / 会话 ID）
+watch-bind.js
+
+DEPLOY-NOTES.local.md
