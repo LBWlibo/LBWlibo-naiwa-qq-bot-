@@ -270,23 +270,17 @@ def main() -> int:
             down = [p for p in PORTS if not port_open(p)]
             if down:
                 only_onebot = set(down) <= {3000, 3001} and port_open(5099)
-                if only_onebot and not qq_login_fresh():
-                    # SnowLuma 活着但 OneBot 端口没了 = QQ 没登录，不是服务挂了。
-                    # 拉起也没用，只在日志里每 10 分钟提醒一次。
-                    if time.time() - last_offline_notice > 600:
+                if only_onebot:
+                    # 只掉 OneBot 端口：SnowLuma 活着。这里不自动重启，
+                    # 只在 QQ 没登录时提醒一次（登录后由启动脚本负责挂载）。
+                    if not qq_login_fresh() and time.time() - last_offline_notice > 600:
                         last_offline_notice = time.time()
                         log("QQ 掉线：OneBot 端口未监听（5099 正常）。"
                             "需要人工在 QQ 客户端重新登录，登录后会自动恢复。")
                         toast("奶娃掉线了", "QQ 退出登录了，去扫码登录一下；登完会自动恢复")
-                elif only_onebot and qq_login_fresh():
-                    # QQ 明明登录了，SnowLuma 却没挂上 -> 重启它去重新发现
-                    if time.time() - last_offline_notice > 120:
+                    elif qq_login_fresh() and time.time() - last_offline_notice > 600:
                         last_offline_notice = time.time()
-                        log("QQ 已登录但 OneBot 未就绪：重启 SnowLuma 重新发现")
-                        run_starter()
-                        time.sleep(10)
-                        if port_open(3000) and port_open(3001):
-                            log("重启 SnowLuma 后恢复")
+                        log("QQ 在线但 OneBot 没起来：不自动重启，需要时跑一次 start_bot.bat")
                 else:
                     log("发现掉线端口：" + ", ".join(f"{p}({PORTS[p]})" for p in down))
                     run_starter()
