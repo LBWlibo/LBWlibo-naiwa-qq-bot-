@@ -73,6 +73,18 @@ STUCK_SECONDS = 150          # 一个轮次超过这么久没动静就算卡死
 CHECK_INTERVAL = 30
 
 DETACHED = 0x00000008 | 0x00000200
+NO_WINDOW = 0x08000000
+
+# 所有子进程都不弹控制台窗口（否则每 30 秒闪一次黑框）
+_orig_run = subprocess.run
+
+
+def _quiet_run(*args, **kwargs):
+    kwargs.setdefault("creationflags", NO_WINDOW)
+    return _orig_run(*args, **kwargs)
+
+
+subprocess.run = _quiet_run
 
 
 def _newest_mtime(root: Path, depth: int = 3) -> float:
@@ -289,6 +301,8 @@ def main() -> int:
     try:
         last_offline_notice = 0.0
         last_load_try = 0.0
+        bridge_fail = 0
+        last_bridge_fix = 0.0
         while True:
             down = [p for p in PORTS if not port_open(p)]
             if down:
@@ -316,11 +330,18 @@ def main() -> int:
                     if still and not (set(still) <= {3000, 3001} and port_open(5099)):
                         log("补齐失败，仍有端口未起：" + ", ".join(map(str, still)))
 
-            if port_open(3000) and port_open(3001) and port_open(3080) and not bridge_connected():
-                log("桥接断开（端口正常），尝试重连")
-                bridge_reconnect()
+            if port_open(3000) and port_open(3001) and port_open(3080):
                 if bridge_connected():
-                    log("桥接重连成功")
+                    bridge_fail = 0
+                else:
+                    bridge_fail += 1
+                    if bridge_fail >= 2 and time.time() - last_bridge_fix > 180:
+                        last_bridge_fix = time.time()
+                        log("桥接连续两次断开，尝试重连")
+                        bridge_reconnect()
+                        if bridge_connected():
+                            log("桥接重连成功")
+                            bridge_fail = 0
 
             st = session_state()
             if st and st.get("open") and st.get("last_age_s", 0) > STUCK_SECONDS:
