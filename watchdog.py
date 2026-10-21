@@ -134,6 +134,28 @@ def bridge_reconnect() -> None:
         pass
 
 
+def try_load_qq() -> bool:
+    """轻量补挂：只调 SnowLuma 的 load 接口，不重启任何服务。"""
+    pw = str(_cfg("SNOWLUMA_PASSWORD", "") or "")
+    node = ROOT / "SnowLuma" / "node.exe"
+    script = HERE / "snowluma-load.js"
+    if not pw or not node.exists() or not script.exists():
+        return False
+    env = os.environ.copy()
+    env["SL_PASSWORD"] = pw
+    env["SL_PORT"] = "5099"
+    try:
+        subprocess.run([str(node), str(script)], cwd=str(HERE), env=env,
+                       capture_output=True, timeout=90)
+    except Exception:
+        return False
+    for _ in range(15):
+        if port_open(3000) and port_open(3001):
+            return True
+        time.sleep(1)
+    return False
+
+
 def toast(title: str, message: str) -> None:
     """Windows 气泡通知（QQ 掉线时提醒用户去扫码）"""
     try:
@@ -266,6 +288,7 @@ def main() -> int:
     state = {"restarts": 0, "last_restart": 0}
     try:
         last_offline_notice = 0.0
+        last_load_try = 0.0
         while True:
             down = [p for p in PORTS if not port_open(p)]
             if down:
@@ -278,9 +301,13 @@ def main() -> int:
                         log("QQ 掉线：OneBot 端口未监听（5099 正常）。"
                             "需要人工在 QQ 客户端重新登录，登录后会自动恢复。")
                         toast("奶娃掉线了", "QQ 退出登录了，去扫码登录一下；登完会自动恢复")
-                    elif qq_login_fresh() and time.time() - last_offline_notice > 600:
-                        last_offline_notice = time.time()
-                        log("QQ 在线但 OneBot 没起来：不自动重启，需要时跑一次 start_bot.bat")
+                    elif qq_login_fresh() and time.time() - last_load_try > 300:
+                        last_load_try = time.time()
+                        log("QQ 在线但 OneBot 没起来：尝试自动挂载（不重启）")
+                        if try_load_qq():
+                            log("自动挂载成功")
+                        else:
+                            log("自动挂载没成功，需要时手动跑一次 start_bot.bat")
                 else:
                     log("发现掉线端口：" + ", ".join(f"{p}({PORTS[p]})" for p in down))
                     run_starter()
