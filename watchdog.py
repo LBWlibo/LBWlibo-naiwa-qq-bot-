@@ -72,7 +72,7 @@ def session_file() -> Path | None:
 STUCK_SECONDS = 150          # 一个轮次超过这么久没动静就算卡死
 CHECK_INTERVAL = 30
 
-DETACHED = 0x00000008 | 0x00000200
+DETACHED = 0x08000000 | 0x00000200  # CREATE_NO_WINDOW
 NO_WINDOW = 0x08000000
 
 # 所有子进程都不弹控制台窗口（否则每 30 秒闪一次黑框）

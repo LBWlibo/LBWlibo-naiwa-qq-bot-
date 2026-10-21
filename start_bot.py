@@ -8,7 +8,7 @@
 - 已在跑的服务跳过，不重复拉起
 - SnowLuma 冷启动不会主动发现已登录的 QQ，所以这里等登录完成再起它，
   起完再调它的内部接口「加载」一次做兜底
-- 子进程用 DETACHED_PROCESS，关掉窗口后继续运行
+- 子进程用 CREATE_NO_WINDOW：后台运行，不弹控制台窗口
 - DSH 的 token 每次重启都变，从它日志里抓出来存到 current-url.txt
 """
 from __future__ import annotations
@@ -66,7 +66,9 @@ PORTS = {
     "DSH web": DSH_PORT,
 }
 
-DETACHED = 0x00000008 | 0x00000200
+# Win11 默认终端是 Windows Terminal：DETACHED_PROCESS 反而会弹一个控制台窗口。
+# 用 CREATE_NO_WINDOW：有控制台但不显示窗口。
+NO_WINDOW = 0x08000000 | 0x00000200
 
 
 # ── 基础工具 ─────────────────────────────────────────────────
@@ -139,7 +141,7 @@ def spawn(cmd: list[str], cwd: Path, log_name: str, env: dict | None = None) -> 
         child_env.update(env)
     subprocess.Popen(cmd, cwd=str(cwd), stdin=subprocess.DEVNULL,
                      stdout=handle, stderr=subprocess.STDOUT, env=child_env,
-                     creationflags=DETACHED, close_fds=True)
+                     creationflags=NO_WINDOW, close_fds=True)
 
 
 def process_running(image: str) -> bool:
@@ -191,7 +193,7 @@ def ensure_qq() -> None:
     log(f"QQ：启动 {exe}")
     subprocess.Popen([str(exe)], cwd=str(Path(exe).parent),
                      stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
-                     stderr=subprocess.DEVNULL, creationflags=DETACHED, close_fds=True)
+                     stderr=subprocess.DEVNULL, creationflags=NO_WINDOW, close_fds=True)
     for _ in range(60):
         if process_running("QQ.exe"):
             log("QQ：进程已起来")
@@ -326,7 +328,7 @@ def ensure_dsh(attempt: int = 0) -> bool:
     subprocess.Popen(f'"{cmd}" --profile {DSH_PROFILE} --port {DSH_PORT} --no-open',
                      cwd=str(ROOT), shell=True, stdin=subprocess.DEVNULL,
                      stdout=handle, stderr=subprocess.STDOUT,
-                     creationflags=DETACHED, close_fds=True)
+                     creationflags=NO_WINDOW, close_fds=True)
 
     deadline = time.time() + 150
     while time.time() < deadline:
