@@ -29,3 +29,6 @@ DSH_CMD = r""
 DSH_PROFILE = "web"
 # DSH web 端口
 DSH_PORT = 3080
+# 每天自动抓几张新表情（1=开，0=关）与数量
+STICKER_AUTO_FETCH = 1
+STICKER_DAILY_COUNT = 3

@@ -289,6 +289,39 @@ def already_running() -> bool:
         return False
 
 
+def maybe_fetch_stickers() -> None:
+    """每天抓几张新表情（一天只跑一次）。"""
+    if not _cfg("STICKER_AUTO_FETCH", True):
+        return
+    state_path = LOGS / "sticker-fetch.json"
+    today = datetime.now().strftime("%Y-%m-%d")
+    try:
+        if json.loads(state_path.read_text(encoding="utf-8")).get("last") == today:
+            return
+    except Exception:
+        pass
+
+    node = ROOT / "SnowLuma" / "node.exe"
+    script = HERE / "fetch_stickers.js"
+    if not node.exists() or not script.exists():
+        return
+
+    count = int(_cfg("STICKER_DAILY_COUNT", 3))
+    env = os.environ.copy()
+    env["STICKER_DIR"] = str(ROOT / "stickers")
+    env["STICKER_COUNT"] = str(max(1, min(10, count)))
+    log(f"每日表情：开始抓 {env['STICKER_COUNT']} 张")
+    try:
+        proc = subprocess.run([str(node), str(script)], cwd=str(HERE), env=env,
+                              capture_output=True, timeout=600)
+        out = (proc.stdout or b"").decode("utf-8", "ignore")
+        added = out.count("  + ")
+        log(f"每日表情：新增 {added} 张")
+        state_path.write_text(json.dumps({"last": today, "added": added}), encoding="utf-8")
+    except Exception as exc:
+        log("每日表情：抓取失败 " + str(exc))
+
+
 def main() -> int:
     LOGS.mkdir(parents=True, exist_ok=True)
     if already_running():
@@ -342,6 +375,8 @@ def main() -> int:
                         if bridge_connected():
                             log("桥接重连成功")
                             bridge_fail = 0
+
+            maybe_fetch_stickers()
 
             st = session_state()
             if st and st.get("open") and st.get("last_age_s", 0) > STUCK_SECONDS:
