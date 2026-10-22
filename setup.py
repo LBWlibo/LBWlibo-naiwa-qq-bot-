@@ -63,6 +63,32 @@ def find_qq() -> str:
     return ""
 
 
+def install_autostart(root: Path) -> bool:
+    """在「启动」文件夹放一个快捷方式，登录时用 wscript 隐藏启动。"""
+    startup = Path(os.environ.get("APPDATA", "")) / "Microsoft/Windows/Start Menu/Programs/Startup"
+    if not startup.exists():
+        return False
+    lnk = startup / "naiwa-bot.lnk"
+    vbs = root / "自动启动.vbs"
+    ps_lines = [
+        "$ws = New-Object -ComObject WScript.Shell",
+        f'$s = $ws.CreateShortcut("{lnk}")',
+        '$s.TargetPath = "C:\\Windows\\System32\\wscript.exe"',
+        '$s.Arguments = \'"' + str(vbs) + '"\'',
+        f'$s.WorkingDirectory = "{root}"',
+        "$s.WindowStyle = 7",
+        "$s.Save()",
+    ]
+    script = Path(os.environ.get("TEMP", ".")) / "naiwa_autostart.ps1"
+    script.write_text("\r\n".join(ps_lines), encoding="utf-8-sig")
+    try:
+        subprocess.run(["powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", str(script)],
+                       capture_output=True, timeout=60, creationflags=0x08000000)
+        return lnk.exists()
+    except Exception:
+        return False
+
+
 def main() -> int:
     print("=" * 56)
     print("奶娃 QQ 机器人 · 配置向导")
@@ -126,6 +152,12 @@ DSH_PORT = 3080
         print("\n还需要处理：")
         for m in missing:
             print("  · " + m)
+    if ask_yes("\n要设置开机自启吗（登录后自动启动机器人）？", True):
+        if install_autostart(rootp):
+            print("✓ 已加入启动文件夹")
+        else:
+            print("× 自启设置失败，可手动把 自动启动.vbs 的快捷方式放进 shell:startup")
+
     print("\n下一步：")
     print("  1. 把 SnowLuma 的 win-x64 包解压到 " + str(rootp / "SnowLuma"))
     print("  2. 装桥接插件：dsh plugin --profile web add dsh-plugin-qq-bridge")
